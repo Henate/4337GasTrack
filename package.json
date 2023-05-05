@@ -27,7 +27,7 @@
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.2",
     "typechain": "^8.1.1",
-    "userop": "^0.1.6"
+    "userop": "^0.2.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.5",
