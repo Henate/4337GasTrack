@@ -955,15 +955,10 @@
   dependencies:
     "@types/node" "*"
 
-"@types/prettier@^2.1.1":
+"@types/prettier@^2.1.1", "@types/prettier@^2.7.2":
   version "2.7.2"
   resolved "https://registry.npmmirror.com/@types/prettier/-/prettier-2.7.2.tgz#6c2324641cc4ba050a8c710b2b251b377581fbf0"
   integrity sha512-KufADq8uQqo1pYKVIYzfKbJfBAc0sOeXqGbFaSpv8MRmC/zXgowNZmFcbngndGk922QDmOASEXUZCaY48gs4cg==
-
-"@types/prettier@^2.7.1":
-  version "2.7.1"
-  resolved "https://registry.npmjs.org/@types/prettier/-/prettier-2.7.1.tgz"
-  integrity sha512-ri0UmynRRvZiiUJdiz38MmIblKK+oH30MztdBVR95dv/Ubw6neWSb8u1XpRb72L4qsZOhz+L+z9JD40SJmfWow==
 
 "@types/qs@^6.2.31":
   version "6.9.7"
@@ -4163,15 +4158,10 @@ prelude-ls@~1.1.2:
   resolved "https://registry.npmmirror.com/prelude-ls/-/prelude-ls-1.1.2.tgz#21932a549f5e52ffd9a827f570e04be62a97da54"
   integrity sha512-ESF23V4SKG6lVSGZgYNpbsiaAkdab6ZgOxe52p7+Kid3W3u3bxR4Vfd/o21dmN7jSt0IwgZ4v5MUd26FEtXE9w==
 
-prettier@^2.3.1:
+prettier@^2.3.1, prettier@^2.8.8:
   version "2.8.8"
   resolved "https://registry.npmmirror.com/prettier/-/prettier-2.8.8.tgz#e8c5d7e98a4305ffe3de2e1fc4aca1a71c28b1da"
   integrity sha512-tdN8qQGvNjw4CHbY+XXk0JgCXn9QiF21a55rBe5LJAU+kDyC4WQn4+awm2Xfk2lQMk5fKup9XgzTZtGkjBdP9Q==
-
-prettier@^2.8.0:
-  version "2.8.0"
-  resolved "https://registry.npmjs.org/prettier/-/prettier-2.8.0.tgz"
-  integrity sha512-9Lmg8hTFZKG0Asr/kW9Bp8tJjRVluO8EJQVfY2T7FMw9T5jy4I/Uvx0Rca/XWf50QQ1/SS48+6IJWnrb+2yemA==
 
 process-nextick-args@~2.0.0:
   version "2.0.1"
