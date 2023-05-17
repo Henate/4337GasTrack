@@ -16,12 +16,25 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers:[
       {
-        version :"0.8.18"
+        version :"0.8.18",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 300
+          }
+        }          
       },
       {
+        version: "0.8.7"
+      },      
+      {
         version: "0.8.9"
-      }
-    ]
+      },
+      {
+        version: "0.8.12"
+      }      
+    ],
+
   },
   gasReporter: {
     enabled: true,
