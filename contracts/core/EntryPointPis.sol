@@ -59,21 +59,17 @@ contract EntryPointPis is
    * @param opIndex index into the opInfo array
    * @param userOp the userOp to execute
    * @param opInfo the opInfo filled by validatePrepayment for this userOp.
-   * @return collected the total amount this userOp paid.
+   *
    */
   function _executeUserOp(
     uint256 opIndex,
     UserOperation calldata userOp,
     UserOpInfo memory opInfo
-  ) private returns (uint256 collected) {
+  ) private {
     uint256 preGas = gasleft();
     bytes memory context = getMemoryBytesFromOffset(opInfo.contextOffset);
 
-    try this.innerHandleOp(userOp.callData, opInfo, context) returns (
-      uint256 _actualGasCost
-    ) {
-      collected = _actualGasCost;
-    } catch {
+    try this.innerHandleOp(userOp.callData, opInfo, context) {} catch {
       bytes32 innerRevertCode;
       assembly {
         returndatacopy(0, 0, 32)
@@ -87,7 +83,7 @@ contract EntryPointPis is
       }
 
       uint256 actualGas = preGas - gasleft() + opInfo.preOpGas;
-      collected = _handlePostOp(
+      _handlePostOp(
         opIndex,
         IPaymaster.PostOpMode.postOpReverted,
         opInfo,
@@ -138,11 +134,10 @@ contract EntryPointPis is
   /**
    * Execute a batch of UserOperation with Aggregators
    * @param opsPerAggregator the operations to execute, grouped by aggregator (or address(0) for no-aggregator accounts)
-   * @param beneficiary the address to receive the fees
+   *
    */
   function handleAggregatedOps(
-    UserOpsPerAggregator[] calldata opsPerAggregator,
-    address payable beneficiary
+    UserOpsPerAggregator[] calldata opsPerAggregator
   ) public nonReentrant {
     uint256 opasLen = opsPerAggregator.length;
     uint256 totalOps = 0;
@@ -191,7 +186,7 @@ contract EntryPointPis is
       }
     }
 
-    uint256 collected = 0;
+    //uint256 collected = 0;
     opIndex = 0;
     for (uint256 a = 0; a < opasLen; a++) {
       UserOpsPerAggregator calldata opa = opsPerAggregator[a];
@@ -200,13 +195,13 @@ contract EntryPointPis is
       uint256 opslen = ops.length;
 
       for (uint256 i = 0; i < opslen; i++) {
-        collected += _executeUserOp(opIndex, ops[i], opInfos[opIndex]);
+        _executeUserOp(opIndex, ops[i], opInfos[opIndex]);
         opIndex++;
       }
     }
     emit SignatureAggregatorChanged(address(0));
 
-    _compensate(beneficiary, collected);
+    //_compensate(beneficiary, collected);
   }
 
   /// @inheritdoc IEntryPointPis
@@ -227,7 +222,7 @@ contract EntryPointPis is
     );
 
     numberMarker();
-    uint256 paid = _executeUserOp(0, op, opInfo);
+    _executeUserOp(0, op, opInfo);
     numberMarker();
     bool targetSuccess;
     bytes memory targetResult;
@@ -236,7 +231,7 @@ contract EntryPointPis is
     }
     revert ExecutionResult(
       opInfo.preOpGas,
-      paid,
+      0,
       data.validAfter,
       data.validUntil,
       targetSuccess,

@@ -226,6 +226,8 @@ describe('handle ERC20 token with 4337 solution', () => {
   let token: TestToken
   let beneficiaryAddress: string
   let simpleAccountFactory: SimpleAccountFactory
+  let gasFirst: number
+  let gasSecond: number
 
   before(async () => {
     accountOwner = createAccountOwner()
@@ -367,6 +369,9 @@ describe('handle ERC20 token with 4337 solution', () => {
       'avgGas:',
       tx.gasUsed.div(testLoopLimit).toString()
     )
+
+    gasFirst = tx.gasUsed.toNumber()
+
     for (let testloop = 0; testloop < testLoopLimit; testloop++) {
       const balance = await token.balanceOf(accountOwners[testloop].address)
       // console.log(
@@ -407,6 +412,8 @@ describe('handle ERC20 token with 4337 solution', () => {
       })
       .then(async (t) => await t.wait())
 
+    gasSecond = tx.gasUsed.toNumber()
+
     console.log(
       'Pis modification: batch transfer gasused:',
       tx.gasUsed.toString(),
@@ -423,5 +430,16 @@ describe('handle ERC20 token with 4337 solution', () => {
       // )
       expect(balance).to.equal((testloop + 1) * 100)
     }
+  })
+
+  it('compare gas difference', async () => {
+    console.log('gasFirst:', gasFirst, 'gasSecond:', gasSecond)
+    console.log(
+      'gasdiff:',
+      gasFirst - gasSecond,
+      'gasdiff%:',
+      (gasFirst - gasSecond) / gasFirst
+    )
+    expect(gasFirst).to.be.greaterThan(gasSecond)
   })
 })
