@@ -1,6 +1,7 @@
 import { ethers } from 'hardhat'
 import {
   EntryPoint,
+  EntryPointPis,
   EntryPoint__factory,
   SimpleAccountFactory,
   SimpleAccount,
@@ -9,6 +10,7 @@ import {
   TestCounter__factory,
   TestToken__factory,
   TestToken,
+  EntryPointPis__factory,
 } from '../typechain-types'
 import {
   createAccount,
@@ -23,10 +25,13 @@ import { expect } from 'chai'
 import { fillAndSign } from './UserOp'
 import { UserOperationStruct } from 'userop/dist/typechain/EntryPoint'
 
+// EntryPoint 与 EntryopintPis的interface
+// 如何使EntryPoints继承EntryPoint和EntryPointPis的interface
+
 async function generateBatchofERC20TransferOp(
   signer: Signer,
   token: TestToken,
-  entryPoint: EntryPoint,
+  entryPoint: any,
   adminAccount: SimpleAccount,
   testLoop: number
 ) {
@@ -52,7 +57,7 @@ async function generateBatchofERC20TransferOp(
   ))
 
   await fund(account.address)
-  await token.mint(account.address, 1000)
+  await token.mint(account.address, 100000)
 
   const op = await fillAndSign(
     {
@@ -64,7 +69,7 @@ async function generateBatchofERC20TransferOp(
     accountOwner,
     entryPoint
   )
-  console.log('loop:', testLoop, 'toOwner:', accountOwner.address)
+  // console.log('loop:', testLoop, 'toOwner:', accountOwner.address)
   return { op, accountOwner, account }
 }
 
@@ -214,6 +219,7 @@ describe('SimpleAccount', () => {
 
 describe('handle ERC20 token with 4337 solution', () => {
   let entryPoint: EntryPoint
+  let entryPointPis: EntryPointPis
   const ethersSigners = ethers.provider.getSigner()
   let accountOwner: Wallet
   let account: SimpleAccount
@@ -225,6 +231,7 @@ describe('handle ERC20 token with 4337 solution', () => {
     accountOwner = createAccountOwner()
     beneficiaryAddress = createAddress()
     entryPoint = await new EntryPoint__factory(ethersSigners).deploy()
+    entryPointPis = await new EntryPointPis__factory(ethersSigners).deploy()
     account = await new SimpleAccount__factory(ethersSigners).deploy(
       entryPoint.address
     )
@@ -341,13 +348,11 @@ describe('handle ERC20 token with 4337 solution', () => {
         account,
         testLoop
       )
-
       ops.push(op)
-
       accountOwners.push(accountOwner)
     }
 
-    console.log('op', ops[0])
+    //console.log('op', ops[0])
 
     const tx = await entryPoint
       .handleOps(ops, accountOwner.address, {
@@ -364,12 +369,58 @@ describe('handle ERC20 token with 4337 solution', () => {
     )
     for (let testloop = 0; testloop < testLoopLimit; testloop++) {
       const balance = await token.balanceOf(accountOwners[testloop].address)
-      console.log(
-        'account:',
-        accountOwners[testloop].address,
-        'balance:',
-        balance.toString()
+      // console.log(
+      //   'account:',
+      //   accountOwners[testloop].address,
+      //   'balance:',
+      //   balance.toString()
+      // )
+      expect(balance).to.equal((testloop + 1) * 100)
+    }
+  })
+
+  it('Pis modification: handle batch of ERC20 transfer Ops', async () => {
+    const testLoopLimit = 10
+    const ops: UserOperationStruct[] = []
+    const ercAccounts: SimpleAccount[] = []
+    const accountOwners: Wallet[] = []
+    let ercAccount: SimpleAccount
+
+    for (let testLoop = 0; testLoop < testLoopLimit; testLoop++) {
+      const { op, accountOwner } = await generateBatchofERC20TransferOp(
+        ethersSigners,
+        token,
+        entryPointPis,
+        account,
+        testLoop
       )
+      ops.push(op)
+      accountOwners.push(accountOwner)
+    }
+
+    //console.log('op', ops[0])
+
+    const tx = await entryPointPis
+      .handleOps(ops, {
+        maxFeePerGas: 1e9,
+        maxPriorityFeePerGas: 1e9,
+      })
+      .then(async (t) => await t.wait())
+
+    console.log(
+      'Pis modification: batch transfer gasused:',
+      tx.gasUsed.toString(),
+      'avgGas:',
+      tx.gasUsed.div(testLoopLimit).toString()
+    )
+    for (let testloop = 0; testloop < testLoopLimit; testloop++) {
+      const balance = await token.balanceOf(accountOwners[testloop].address)
+      // console.log(
+      //   'account:',
+      //   accountOwners[testloop].address,
+      //   'balance:',
+      //   balance.toString()
+      // )
       expect(balance).to.equal((testloop + 1) * 100)
     }
   })
