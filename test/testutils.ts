@@ -33,6 +33,7 @@ let counter = 0
 
 export function createAccountOwner(): Wallet {
   const privateKey = keccak256(Buffer.from(arrayify(BigNumber.from(++counter))))
+  //console.log('create new account')
   return new ethers.Wallet(privateKey, ethers.provider)
   // return new ethers.Wallet('0x'.padEnd(66, privkeyBase), ethers.provider);
 }

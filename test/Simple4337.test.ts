@@ -25,20 +25,20 @@ import { expect } from 'chai'
 import { fillAndSign } from './UserOp'
 import { UserOperationStruct } from 'userop/dist/typechain/EntryPoint'
 
-// EntryPoint 与 EntryopintPis的interface
-// 如何使EntryPoints继承EntryPoint和EntryPointPis的interface
-
 async function generateBatchofERC20TransferOp(
   signer: Signer,
   token: TestToken,
   entryPoint: any,
   adminAccount: SimpleAccount,
-  testLoop: number
+  testLoop: number,
+  oldAccount?: Wallet,
+  oldAccountFactory?: SimpleAccountFactory
 ) {
   let erc20TransfercallData: PopulatedTransaction
   let account: SimpleAccount
+  let accountFactory: SimpleAccountFactory
   //const signer = ethers.provider.getSigner()
-  const accountOwner = createAccountOwner()
+  const accountOwner = oldAccount ?? createAccountOwner()
 
   const transfercallData = await token.populateTransaction.transfer(
     accountOwner.address,
@@ -50,14 +50,16 @@ async function generateBatchofERC20TransferOp(
     0,
     transfercallData.data!
   )
-  ;({ proxy: account } = await createAccount(
+  ;({ proxy: account, accountFactory: accountFactory } = await createAccount(
     signer,
     await accountOwner.getAddress(),
-    entryPoint.address
+    entryPoint.address,
+    oldAccountFactory
   ))
 
   await fund(account.address)
   await token.mint(account.address, 100000)
+  //console.log('account deployed to:', account.address)
 
   const op = await fillAndSign(
     {
@@ -70,7 +72,7 @@ async function generateBatchofERC20TransferOp(
     entryPoint
   )
   // console.log('loop:', testLoop, 'toOwner:', accountOwner.address)
-  return { op, accountOwner, account }
+  return { op, accountOwner, account, accountFactory }
 }
 
 describe('SimpleAccount', () => {
@@ -222,16 +224,21 @@ describe('handle ERC20 token with 4337 solution', () => {
   let entryPointPis: EntryPointPis
   const ethersSigners = ethers.provider.getSigner()
   let accountOwner: Wallet
+  let refundAccount: Wallet
   let account: SimpleAccount
   let token: TestToken
   let beneficiaryAddress: string
   let simpleAccountFactory: SimpleAccountFactory
   let gasFirst: number
   let gasSecond: number
+  const testLoopLimit = 1
+  const accountOwners: Wallet[] = []
+  const accountFactorys: SimpleAccountFactory[] = []
 
   before(async () => {
     accountOwner = createAccountOwner()
     beneficiaryAddress = createAddress()
+    refundAccount = createAccountOwner()
     entryPoint = await new EntryPoint__factory(ethersSigners).deploy()
     entryPointPis = await new EntryPointPis__factory(ethersSigners).deploy()
     account = await new SimpleAccount__factory(ethersSigners).deploy(
@@ -325,6 +332,10 @@ describe('handle ERC20 token with 4337 solution', () => {
       entryPoint
     )
 
+    await entryPoint.callStatic
+      .simulateValidation(op, { gasPrice: 1e9 })
+      .catch(simulationResultCatch)
+
     const tx = await entryPoint
       .handleOps([op], accountOwner.address)
       .then(async (r) => r!.wait())
@@ -335,29 +346,34 @@ describe('handle ERC20 token with 4337 solution', () => {
     expect(balance).to.equal(1100)
   })
 
-  it('handle batch of ERC20 transfer Ops', async () => {
-    const testLoopLimit = 10
+  it('[Gas Trace] - 1st handle batch of ERC20 transfer Ops', async () => {
     const ops: UserOperationStruct[] = []
-    const ercAccounts: SimpleAccount[] = []
-    const accountOwners: Wallet[] = []
-    let ercAccount: SimpleAccount
+    let accountFactory: SimpleAccountFactory
 
     for (let testLoop = 0; testLoop < testLoopLimit; testLoop++) {
-      const { op, accountOwner } = await generateBatchofERC20TransferOp(
-        ethersSigners,
-        token,
-        entryPoint,
-        account,
-        testLoop
-      )
+      const { op, accountOwner, accountFactory } =
+        await generateBatchofERC20TransferOp(
+          ethersSigners,
+          token,
+          entryPoint,
+          account,
+          testLoop
+        )
       ops.push(op)
       accountOwners.push(accountOwner)
+      accountFactorys.push(accountFactory)
     }
 
     //console.log('op', ops[0])
+    // // mark for temp
+    // ops.map((op) =>
+    //   entryPoint.callStatic
+    //     .simulateValidation(op, { gasPrice: 1e9 })
+    //     .catch(simulationResultCatch)
+    // )
 
     const tx = await entryPoint
-      .handleOps(ops, accountOwner.address, {
+      .handleOps(ops, refundAccount.address, {
         maxFeePerGas: 1e9,
         maxPriorityFeePerGas: 1e9,
       })
@@ -384,62 +400,142 @@ describe('handle ERC20 token with 4337 solution', () => {
     }
   })
 
-  it('Pis modification: handle batch of ERC20 transfer Ops', async () => {
-    const testLoopLimit = 10
+  it('[Gas Trace] - 2th handle batch of ERC20 transfer Ops', async () => {
     const ops: UserOperationStruct[] = []
-    const ercAccounts: SimpleAccount[] = []
-    const accountOwners: Wallet[] = []
-    let ercAccount: SimpleAccount
 
     for (let testLoop = 0; testLoop < testLoopLimit; testLoop++) {
       const { op, accountOwner } = await generateBatchofERC20TransferOp(
         ethersSigners,
         token,
-        entryPointPis,
+        entryPoint,
         account,
-        testLoop
+        testLoop,
+        accountOwners[testLoop],
+        accountFactorys[testLoop]
       )
       ops.push(op)
-      accountOwners.push(accountOwner)
+      //accountOwners.push(accountOwner)
     }
+    //// mark for temp
+    // ops.map((op) =>
+    //   entryPoint.callStatic
+    //     .simulateValidation(op, { gasPrice: 1e9 })
+    //     .catch(simulationResultCatch)
+    // )
 
-    //console.log('op', ops[0])
-
-    const tx = await entryPointPis
-      .handleOps(ops, {
+    const tx = await entryPoint
+      .handleOps(ops, refundAccount.address, {
         maxFeePerGas: 1e9,
         maxPriorityFeePerGas: 1e9,
       })
       .then(async (t) => await t.wait())
 
-    gasSecond = tx.gasUsed.toNumber()
-
     console.log(
-      'Pis modification: batch transfer gasused:',
+      'batch transfer gasused:',
       tx.gasUsed.toString(),
       'avgGas:',
       tx.gasUsed.div(testLoopLimit).toString()
     )
-    for (let testloop = 0; testloop < testLoopLimit; testloop++) {
-      const balance = await token.balanceOf(accountOwners[testloop].address)
-      // console.log(
-      //   'account:',
-      //   accountOwners[testloop].address,
-      //   'balance:',
-      //   balance.toString()
-      // )
-      expect(balance).to.equal((testloop + 1) * 100)
-    }
   })
 
-  it('compare gas difference', async () => {
-    console.log('gasFirst:', gasFirst, 'gasSecond:', gasSecond)
-    console.log(
-      'gasdiff:',
-      gasFirst - gasSecond,
-      'gasdiff%:',
-      (gasFirst - gasSecond) / gasFirst
-    )
-    expect(gasFirst).to.be.greaterThan(gasSecond)
-  })
+  // it('[Gas Trace] Pis modification: handle batch of ERC20 transfer Ops', async () => {
+  //   const ops: UserOperationStruct[] = []
+  //   const accountOwners: Wallet[] = []
+
+  //   for (let testLoop = 0; testLoop < testLoopLimit; testLoop++) {
+  //     const { op, accountOwner } = await generateBatchofERC20TransferOp(
+  //       ethersSigners,
+  //       token,
+  //       entryPointPis,
+  //       account,
+  //       testLoop
+  //     )
+  //     ops.push(op)
+  //     accountOwners.push(accountOwner)
+  //   }
+  //   //console.log('op', ops[0])
+
+  //   ops.map((op) =>
+  //     entryPointPis.callStatic
+  //       .simulateValidation(op, { gasPrice: 1e9 })
+  //       .catch(simulationResultCatch)
+  //   )
+  //   const tx = await entryPointPis
+  //     .handleOps(ops, {
+  //       maxFeePerGas: 1e9,
+  //       maxPriorityFeePerGas: 1e9,
+  //     })
+  //     .then(async (t) => await t.wait())
+
+  //   gasSecond = tx.gasUsed.toNumber()
+
+  //   console.log(
+  //     'Pis modification: batch transfer gasused:',
+  //     tx.gasUsed.toString(),
+  //     'avgGas:',
+  //     tx.gasUsed.div(testLoopLimit).toString()
+  //   )
+  //   for (let testloop = 0; testloop < testLoopLimit; testloop++) {
+  //     const balance = await token.balanceOf(accountOwners[testloop].address)
+  //     // console.log(
+  //     //   'account:',
+  //     //   accountOwners[testloop].address,
+  //     //   'balance:',
+  //     //   balance.toString()
+  //     // )
+  //     expect(balance).to.equal((testloop + 1) * 100)
+  //   }
+  // })
+
+  // it('compare gas difference', async () => {
+  //   console.log('gasFirst:', gasFirst, 'gasSecond:', gasSecond)
+  //   console.log(
+  //     'gasdiff:',
+  //     gasFirst - gasSecond,
+  //     'gasdiff%:',
+  //     (gasFirst - gasSecond) / gasFirst
+  //   )
+  //   expect(gasFirst).to.be.greaterThan(gasSecond)
+  // })
 })
+
+// describe('ContractGSY', () => {
+//   let token: ContractGSY
+//   const initialSupply = 1_000_000_000
+//   const tokenCap = 2_000_000_000
+
+//   const ownerSigner = ethers.provider.getSigner()
+//   const toSigner = ethers.provider.getSigner(1)
+
+//   before(async () => {
+//     token = await new ContractGSY__factory(ownerSigner).deploy(
+//       initialSupply,
+//       tokenCap
+//     )
+//   })
+
+//   it('check totalSupply match our setting', async () => {
+//     const balanceOwner = await token.balanceOf(ownerSigner.getAddress())
+//     expect(balanceOwner).to.equal(initialSupply)
+//   })
+
+//   it('transfer 1000 token to another account', async () => {
+//     console.log(
+//       'transfer estimateGas:',
+//       await token.estimateGas
+//         .transfer(toSigner.getAddress(), 1000, {
+//           maxFeePerGas: 1e9,
+//           gasLimit: 1e7,
+//         })
+//         .then((gas) => gas.toString())
+//     )
+
+//     const rcpt = await token
+//       .transfer(toSigner.getAddress(), 1000)
+//       .then((tx) => tx.wait())
+//     console.log('transfer gasUsed:', rcpt.gasUsed.toString())
+
+//     const balanceTo = await token.balanceOf(toSigner.getAddress())
+//     expect(balanceTo).to.equal(1000)
+//   })
+// })

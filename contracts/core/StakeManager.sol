@@ -2,6 +2,7 @@
 pragma solidity ^0.8.12;
 
 import '../interfaces/IStakeManager.sol';
+import 'hardhat/console.sol';
 
 /* solhint-disable avoid-low-level-calls */
 /* solhint-disable not-rely-on-time */
@@ -40,10 +41,17 @@ abstract contract StakeManager is IStakeManager {
   }
 
   function _incrementDeposit(address account, uint256 amount) internal {
+    //console.log('[%d] $$incrementDeposit start', gasleft());
+    //console.log('account:%s, amount: %d', account, amount);
     DepositInfo storage info = deposits[account];
+    //console.log('[%d] $$deposits', gasleft());
     uint256 newAmount = info.deposit + amount;
+    //console.log('[%d] $$CalnewAmount', gasleft());
     require(newAmount <= type(uint112).max, 'deposit overflow');
+    //console.log('[%d] $$require', gasleft());
+    //console.log('newAmount: %d', newAmount);
     info.deposit = uint112(newAmount);
+    //console.log('[%d] $$update info.deposit', gasleft());
   }
 
   /**
